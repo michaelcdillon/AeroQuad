@@ -21,40 +21,38 @@
 #ifndef _AQ_BAROMETRIC_SENSOR_
 #define _AQ_BAROMETRIC_SENSOR_
 
+#include "WProgram.h"
 
-class BarometricSensor {
-protected:
-  double altitude;
-  float smoothFactor;
-  float groundAltitude;
+double baroAltitude = 0.0; 
+double baroRawAltitude = 0.0;
+float groundTemperature = 0.0; // remove later
+float groundPressure = 0.0; // remove later
+float groundAltitude = 0.0;
+float baroSmoothFactor = 0.02;
   
-public:
+// **********************************************************************
+// The following function calls must be defined inside any new subclasses
+// **********************************************************************
+void initializeBaro(); 
+void measureBaro();
   
-  BarometricSensor() { 
-    altitude = 0;
-    smoothFactor = 0.02;
-  }
-
-  // **********************************************************************
-  // The following function calls must be defined inside any new subclasses
-  // **********************************************************************
-  virtual void initialize(); 
-  virtual void measure();
-  
-  // *********************************************************
-  // The following functions are common between all subclasses
-  // *********************************************************
-  const float getAltitude() {
-    return altitude - groundAltitude;
-  }
+// *********************************************************
+// The following functions are common between all subclasses
+// *********************************************************
+const float getBaroAltitude() {
+  return baroAltitude - groundAltitude;
+}
  
-  void setSmoothFactor(float value) {
-    smoothFactor = value;
+void measureGroundBaro() {
+  // measure initial ground pressure (multiple samples)
+  groundAltitude = 0;
+  for (int i=0; i < 25; i++) {
+    measureBaro();
+    delay(26);
+    groundAltitude += baroRawAltitude;
   }
-  
-  const float getSmoothFactor() {
-    return smoothFactor;
-  }
-};
+  groundAltitude = groundAltitude / 25.0;
+}
+
 
 #endif

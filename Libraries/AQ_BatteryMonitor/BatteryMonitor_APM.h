@@ -21,7 +21,7 @@
 #ifndef _AQ_BATTERY_MONITOR_APM_
 #define _AQ_BATTERY_MONITOR_APM_
 
-#include "BatteryMonitor.h"
+#include "BatteryMonitorBase.h"
 #include <WProgram.h>
 
 // ***********************************************************************************
@@ -48,94 +48,26 @@
   PIN60--RL_LED--150ohm--GND
 */
 
-#define FL_LED 57 // Ain 2 on Mega
-#define FR_LED 58 // Ain 3 on Mega
-#define RR_LED 59 // Ain 4 on Mega
-#define RL_LED 60 // Ain 5 on Mega
-#define LEDDELAY 200
+float diode = 0.0; //Schottky diode on APM board
+float batteryScaleFactor = 0.0;
 
+void initializeBatteryMonitor(float diodeValue) {
+  float R1   = 10050; //the SMD 10k resistor measured with DMM
+  float R2   =  3260; //3k3 user mounted resistor measured with DMM
+  float Aref = 3.27F; //AREF 3V3 used (solder jumper) and measured with DMM
+  batteryScaleFactor = ((Aref / 1024.0) * ((R1 + R2) / R2));
 
-class BatteryMonitor_APM : public BatteryMonitor {
-private:
-  float diode; //Schottky diode on APM board
-  float batteryScaleFactor;
+  diode = 0.306F; //Schottky diode on APM board, drop measured with DMM
 
-  void ledCW(void){
-    digitalWrite(RL_LED, HIGH);
-    delay(LEDDELAY);
-    digitalWrite(RL_LED, LOW);
-    digitalWrite(RR_LED, HIGH);
-    delay(LEDDELAY);
-    digitalWrite(RR_LED, LOW);
-    digitalWrite(FR_LED, HIGH);
-    delay(LEDDELAY);
-    digitalWrite(FR_LED, LOW);
-    digitalWrite(FL_LED, HIGH);
-    delay(LEDDELAY);
-    digitalWrite(FL_LED, LOW);
-  };
+  analogReference(EXTERNAL); //use Oilpan 3V3 AREF or if wanted, define DEFAULT here to use VCC as reference and define that voltage in BatteryReadArmLed.h
 
-  void ledsON(void){
-    digitalWrite(RL_LED, HIGH);
-    digitalWrite(RR_LED, HIGH);
-    digitalWrite(FR_LED, HIGH);
-    digitalWrite(FL_LED, HIGH);
-  };
+  batteryVoltage = readBatteryVoltage(BATTERYPIN);
+}
 
-  void ledsOFF(void){
-    digitalWrite(RL_LED, LOW);
-    digitalWrite(RR_LED, LOW);
-    digitalWrite(FR_LED, LOW);
-    digitalWrite(FL_LED, LOW);
-  };
+const float readBatteryVoltage(byte channel) {
+  return (analogRead(channel) * batteryScaleFactor) + diode;
+}
 
-public:
-  BatteryMonitor_APM() : BatteryMonitor(){}
-  void initialize(float diodeValue = 0.0) {
-    float R1   = 10050; //the SMD 10k resistor measured with DMM
-    float R2   =  3260; //3k3 user mounted resistor measured with DMM
-    float Aref = 3.27F; //AREF 3V3 used (solder jumper) and measured with DMM
-    batteryScaleFactor = ((Aref / 1024.0) * ((R1 + R2) / R2));
-
-    diode = 0.306F; //Schottky diode on APM board, drop measured with DMM
-
-    analogReference(EXTERNAL); //use Oilpan 3V3 AREF or if wanted, define DEFAULT here to use VCC as reference and define that voltage in BatteryReadArmLed.h
-
-    pinMode(FL_LED ,OUTPUT);
-    pinMode(FR_LED ,OUTPUT);
-    pinMode(RR_LED ,OUTPUT);
-    pinMode(RL_LED ,OUTPUT);
-
-    //batteryVoltage = readBatteryVoltage(BATTERYPIN);
-  }
-
-  void lowBatteryEvent(byte level) {  // <- this logic by Jose Julio
-    static byte batteryCounter=0;
-    byte freq;
-
-    if (level == OK) {
-      ledsON();
-      autoDescent = 0; //reset autoAscent if battery is good
-    }
-    else {
-      batteryCounter++;
-      if (level == WARNING) freq = 40;  //4 seconds wait
-      else freq = 5; //0.5 second wait
-      if (batteryCounter < 2) ledsOFF();  //indicate with led's everytime autoDescent kicks in
-      #if defined(AltitudeHold)
-        if (throttle > 1400) holdAltitude -= 0.2; //-0.2m in 2 fixed rates, one where battery < 10.8V and one where battery < 10.2V, only done if in altitude hold mode
-      #else
-        if (throttle > 1400) autoDescent -= 2; //will remove 2µs throttle every time led's blink in two speeds (10.8 and 10.2V) as long as there is throttle to lower
-      #endif
-      else if (batteryCounter < freq) ledsON();
-      else batteryCounter = 0;
-    }
-  }
-
-  const float readBatteryVoltage(byte channel) {
-    return (analogRead(channel) * batteryScaleFactor) + diode;
-  }
-};
 
 
 

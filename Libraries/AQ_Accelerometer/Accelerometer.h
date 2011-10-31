@@ -24,47 +24,20 @@
 #include <WProgram.h>
 #include <Axis.h>
 
-class Accelerometer {
-protected:
-  float accelScaleFactor;
-  float smoothFactor;
-  float oneG;
-  float meterPerSec[3];
-  float zero[3];
+float accelScaleFactor = 0.0;
+float accelSmoothFactor = 1.0;
+float accelOneG = 0.0;
+float meterPerSec[3] = {0.0,0.0,0.0};
+float accelZero[3] = {0.0,0.0,0.0};
+
+
+void measureAccelSum();
+void evaluateMetersPerSec();
+float accelSample[3] = {0.0,0.0,0.0};
+byte accelSampleCount = 0;
   
-public:  
-  Accelerometer() {};
-
-  virtual void initialize() {}
-  virtual void calibrate() {}
-  virtual void measure() {}
+void initializeAccel();
+void calibrateAccel();
+void measureAccel();
   
-  const float getSmoothFactor() {
-    return smoothFactor;
-  }
-
-  void setSmoothFactor(float value) {
-    smoothFactor = value;
-  }
-
-  void setOneG(float oneG) {
-    this->oneG = oneG;
-  }
-
-  float getOneG() {
-    return oneG;
-  }
-
-  float getMeterPerSec(byte axis) {
-    return meterPerSec[axis];
-  }
-
-  float getZero(byte axis) {
-    return zero[axis];
-  }
-
-  void setZero(byte axis, float zero) {
-    this->zero[axis] = zero;
-  }
-};
 #endif
