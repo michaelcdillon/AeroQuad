@@ -36,6 +36,7 @@
 
 // Null packet
 
+<<<<<<< HEAD
 const int  NO_DATA                   = 0x00;
 const int  FAILED_CHECKSUM           = 0x01;
 
@@ -153,65 +154,62 @@ const double SCALE_ACCEL_Z     = (0.106812 * 9.8065) / 1000;
 const char PACKET_HEADER[] = {'s','n','p'};
 const int HEADER_CHECKSUM = 's'+'n'+'p';
 
+#include <Wire.h>
 
 class Data{
-public:
-	 bool yawEnabled;
-	 bool pitchEnabled;
-	 bool rollEnabled;
-	 bool yawRateEnabled;
-	 bool pitchRateEnabled;
-	 bool rollRateEnabled;
-	 bool mxEnabled;
-	 bool myEnabled;
-	 bool mzEnabled;
-	 bool gxEnabled;
-	 bool gyEnabled;
-	 bool gzEnabled;
-	 bool axEnabled;
-	 bool ayEnabled;
-	 bool azEnabled;
 
-	 double yaw;
-	 double pitch;
-	 double roll;
-	 double yawRate;
-	 double pitchRate;
-	 double rollRate;
-	 double mx;
-	 double my;
-	 double mz;
-	 double gx;
-	 double gy;
-	 double gz;
-	 double ax;
-	 double ay;
-	 double az;
-};
+public:
+             bool yawEnabled;
+             bool pitchEnabled;
+             bool rollEnabled;
+             bool yawRateEnabled;
+             bool pitchRateEnabled;
+             bool rollRateEnabled;
+             bool mxEnabled;
+             bool myEnabled;
+             bool mzEnabled;
+             bool gxEnabled;
+             bool gyEnabled;
+             bool gzEnabled;
+             bool axEnabled;
+             bool ayEnabled;
+             bool azEnabled;
+
+             double yaw;
+             double pitch;
+             double roll;
+             double yawRate;
+             double pitchRate;
+             double rollRate;
+             double mx;
+             double my;
+             double mz;
+             double gx;
+             double gy;
+             double gz;
+             double ax;
+             double ay;
+             double az;
+        };
 
 
 
 
 class CHR6DM {
-public:
-	int packet[100];
-	int packetLength;
-    Data data;
 
+public:
 
 
     CHR6DM(void){
-        packetLength = 0;
+        //Nothing here
     }
 
 
+
+    Data data;
+
   void EKFReset() {
     sendPacket(EKF_RESET);
-    waitForAck(DEFAULT_TIMEOUT);
-  }
-  
-  void zeroRateGyros() {
-    sendPacket(ZERO_RATE_GYROS);
     waitForAck(DEFAULT_TIMEOUT);
   }
 
@@ -226,7 +224,7 @@ public:
         if (!syncToHeader()){
             //Serial.println("Not synced to header");
             packet[0]= NO_DATA;
-            packetLength=1;
+            packet_length=1;
             return NO_DATA;
         }
 
@@ -252,11 +250,11 @@ public:
         if (calculatedChecksum!=packetChecksum) {
             //Serial.print("Bad checksum ");Serial.print(" calculated="); Serial.print(calculatedChecksum);Serial.print(" actual="); Serial.println(packetChecksum);
             packet[0] = FAILED_CHECKSUM;
-            packetLength=1;
+            packet_length=1;
             return FAILED_CHECKSUM;
         }
 
-        packetLength=length;
+        packet_length=length;
         return packet[0];
 
     }
@@ -407,7 +405,7 @@ public:
                 if (data.ayEnabled           ){ data.ay           = SCALE_ACCEL_Y       * bytesToSignedShort(packet[index++],packet[index++]); }
                 if (data.azEnabled           ){ data.az           = SCALE_ACCEL_Z       * bytesToSignedShort(packet[index++],packet[index++]); }
 
-                if (index!=packetLength){
+                if (index!=packet_length){
                     //Serial.println("Recevied bad length packet!");
                     return false;
                 }
@@ -480,9 +478,10 @@ public:
     }
 	
 	void read(){
-      waitForAndReadPacket();
-      requestPacket();
+        waitForAndReadPacket();
+        requestPacket();
     }
+
 };
 
 

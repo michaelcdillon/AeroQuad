@@ -1,5 +1,5 @@
 /*
-  AeroQuad v2.4 - April2011
+  AeroQuad v3.0 - April 2011
   www.AeroQuad.com
   Copyright (c) 2011 Ted Carancho.  All rights reserved.
   An Open Source Arduino based multicopter.
@@ -90,7 +90,6 @@ float smoothHeading;
 #define ROLLRATEPIN 4
 #define YAWRATEPIN 5
 
-
 // Analog Reference Value
 // This value provided from Configurator
 // Use a DMM to measure the voltage between AREF and GND
@@ -98,7 +97,7 @@ float smoothHeading;
 // If you don't have a DMM use the following:
 // AeroQuad Shield v1.7, aref = 3.0
 // AeroQuad Shield v1.6 or below, aref = 2.8
-float aref; // Read in from EEPROM
+float aref;
 
 // Flight Mode
 #define ACRO 0
@@ -132,26 +131,32 @@ float setHeading = 0;
 unsigned long headingTime = micros();
 byte headingHoldState = OFF;
 
-// batteryMonitor & Altutude Hold
+// batteryMonitor & Altitude Hold
 int throttle = 1000;
-int autoDescent = 0;
+int batteyMonitorThrottleCorrection = 0;
+#if defined (BattMonitor)
+  int batteryMonitorStartThrottle = 0;
+  unsigned long batteryMonitorStartTime = 0;
+  #define BATTERY_MONITOR_THROTTLE_TARGET 1200
+  #define BATTERY_MONITOR_GOIN_DOWN_TIME 120000  // 2 minutes
+#endif
 
 // Altitude Hold
-#define ALTPANIC 2 // special state that allows immediate turn off of Altitude hold if large throttle changesa are made at the TX
-#define ALTBUMP 90 // amount of stick movement to cause an altutude bump (up or down)
-#define PANICSTICK_MOVEMENT 250 // 80 if althold on and throttle commanded to move by a gross amount, set PANIC
-//#define MINSTICK_MOVEMENT 32 // any movement less than this doesn't not trigger a rest of the holdaltitude
-#define TEMPERATURE 0
-#define PRESSURE 1
-int throttleAdjust = 0;
+#ifdef AltitudeHold
+  #define ALTPANIC 2 // special state that allows immediate turn off of Altitude hold if large throttle changesa are made at the TX
+  #define ALTBUMP 90 // amount of stick movement to cause an altitude bump (up or down)
+  #define PANICSTICK_MOVEMENT 250 // 80 if althold on and throttle commanded to move by a gross amount, set PANIC
 
+  float altitudeToHoldTarget = 0.0;
+  int altitudeHoldThrottle = 1000;
+  boolean isStoreAltitudeNeeded = false;
+  boolean altitudeHoldState = OFF;  // ON, OFF or ALTPANIC
+#endif
+//int altitudeHoldThrottleCorrection = 0;
 int minThrottleAdjust = -50;
 int maxThrottleAdjust = 50;
-float holdAltitude = 0.0;
-int holdThrottle = 1000;
-float zDampening = 0.0;
-byte storeAltitude = OFF;
-byte altitudeHold = OFF;
+
+
 
 //// Receiver variables
 int delta;
@@ -189,19 +194,14 @@ unsigned long previousTime = 0;
 unsigned long currentTime = 0;
 unsigned long deltaTime = 0;
 // sub loop times
-unsigned long oneHZpreviousTime;
-unsigned long tenHZpreviousTime;
-unsigned long twentyFiveHZpreviousTime;
-unsigned long fiftyHZpreviousTime;
-unsigned long hundredHZpreviousTime;
-// old times.
-//unsigned long receiverTime = 0;
-//unsigned long compassTime = 5000;
-//unsigned long altitudeTime = 10000;
-//unsigned long batteryTime = 15000;
-//unsigned long autoZeroGyroTime = 0;
+unsigned long oneHZpreviousTime = 0;
+unsigned long tenHZpreviousTime = 0;
+unsigned long twentyFiveHZpreviousTime = 0;
+unsigned long fiftyHZpreviousTime = 0;
+unsigned long hundredHZpreviousTime = 0;
+
 #ifdef CameraControl
-unsigned long cameraTime = 10000;
+  unsigned long cameraTime = 10000;
 #endif
 unsigned long fastTelemetryTime = 0;
 //unsigned long telemetryTime = 50000; // make telemetry output 50ms offset from receiver check
@@ -236,13 +236,6 @@ unsigned long fastTelemetryTime = 0;
 /**************************************************************/
 // Enable/disable control loops for debug
 //#define DEBUG
-byte receiverLoop = ON;
-byte telemetryLoop = ON;
-byte sensorLoop = ON;
-byte controlLoop = ON;
-#ifdef CameraControl
-byte cameraLoop = ON; // Note: stabilization camera software is still under development, moved to Arduino Mega
-#endif
 byte fastTransfer = OFF; // Used for troubleshooting
 byte testSignal = LOW;
 
@@ -250,6 +243,8 @@ byte testSignal = LOW;
 // *************************** EEPROM ***************************
 // **************************************************************
 // EEPROM storage addresses
+
+
 typedef struct {
   float p;
   float i;
@@ -257,7 +252,12 @@ typedef struct {
 } t_NVR_PID;
 
 typedef struct {
-    
+  float slope;
+  float offset;
+  float smooth_factor;
+} t_NVR_Receiver;
+
+typedef struct {    
   t_NVR_PID ROLL_PID_GAIN_ADR;
   t_NVR_PID LEVELROLL_PID_GAIN_ADR;
   t_NVR_PID YAW_PID_GAIN_ADR;
@@ -266,6 +266,9 @@ typedef struct {
   t_NVR_PID HEADING_PID_GAIN_ADR;
   t_NVR_PID LEVEL_GYRO_ROLL_PID_GAIN_ADR;
   t_NVR_PID LEVEL_GYRO_PITCH_PID_GAIN_ADR;
+  t_NVR_PID ALTITUDE_PID_GAIN_ADR;
+  t_NVR_PID ZDAMP_PID_GAIN_ADR;
+  t_NVR_Receiver RECEIVER_DATA[LASTCHANNEL];
   
   float WINDUPGUARD_ADR;
   float XMITFACTOR_ADR;
@@ -274,18 +277,18 @@ typedef struct {
   float ACCEL_XAXIS_ZERO_ADR;
   float ACCEL_YAXIS_ZERO_ADR;
   float ACCEL_ZAXIS_ZERO_ADR;
-  float ACCEL_1G_ADR;
   float FILTERTERM_ADR;
   float HEADINGSMOOTH_ADR;
   float AREF_ADR;
   float FLIGHTMODE_ADR;
   float HEADINGHOLD_ADR;
   float MINACRO_ADR;
-  float ALTITUDE_PGAIN_ADR;
+  float ACCEL_1G_ADR;
+//  float ALTITUDE_PGAIN_ADR;
   float ALTITUDE_MAX_THROTTLE_ADR;
   float ALTITUDE_MIN_THROTTLE_ADR;
   float ALTITUDE_SMOOTH_ADR;
-  float ZDAMP_PGAIN_ADR;
+//  float ZDAMP_PGAIN_ADR;
   float ALTITUDE_WINDUP_ADR;
   float MAGXMAX_ADR;
   float MAGXMIN_ADR;
@@ -298,26 +301,8 @@ typedef struct {
   float GYRO_ROLL_ZERO_ADR;
   float GYRO_PITCH_ZERO_ADR;
   float GYRO_YAW_ZERO_ADR;
-
-  float RECEIVER_CHANNEL_0_SLOPE_ADR;
-  float RECEIVER_CHANNEL_0_OFFSET_ADR;
-  float RECEIVER_CHANNEL_0_SMOOTH_FACTOR_ADR;
-  float RECEIVER_CHANNEL_1_SLOPE_ADR;
-  float RECEIVER_CHANNEL_1_OFFSET_ADR;
-  float RECEIVER_CHANNEL_1_SMOOTH_FACTOR_ADR;
-  float RECEIVER_CHANNEL_2_SLOPE_ADR;
-  float RECEIVER_CHANNEL_2_OFFSET_ADR;
-  float RECEIVER_CHANNEL_2_SMOOTH_FACTOR_ADR;
-  float RECEIVER_CHANNEL_3_SLOPE_ADR;
-  float RECEIVER_CHANNEL_3_OFFSET_ADR;
-  float RECEIVER_CHANNEL_3_SMOOTH_FACTOR_ADR;
-  float RECEIVER_CHANNEL_4_SLOPE_ADR;
-  float RECEIVER_CHANNEL_4_OFFSET_ADR;
-  float RECEIVER_CHANNEL_4_SMOOTH_FACTOR_ADR;
-  float RECEIVER_CHANNEL_5_SLOPE_ADR;
-  float RECEIVER_CHANNEL_5_OFFSET_ADR;
-  float RECEIVER_CHANNEL_5_SMOOTH_FACTOR_ADR;
 } t_NVR_Data;  
+
 
 float nvrReadFloat(int address); // defined in DataStorage.h
 void nvrWriteFloat(float value, int address); // defined in DataStorage.h
@@ -331,30 +316,35 @@ void nvrWritePID(unsigned char IDPid, unsigned int IDEeprom);
 #define writePID(IDPid, addr) nvrWritePID(IDPid, GET_NVR_OFFSET(addr))
 
 // defined in DataStorage.h
-void readEEPROM(void); 
-void initSensorsZeroFromEEPROM(void);
-void storeSensorsZeroToEEPROM(void);
-void initReceiverFromEEPROM(void);
+void readEEPROM(); 
+void initSensorsZeroFromEEPROM();
+void storeSensorsZeroToEEPROM();
+void initReceiverFromEEPROM();
 //////////////////////////////////////////////////////
 
 // defined in FlightCommand.pde
-void readPilotCommands(void); 
+void readPilotCommands(); 
 //////////////////////////////////////////////////////
 
-// defined in FlightControl.pde Flight control needed
+// defined in FlightControl.pde Flight control needs
 int motorAxisCommandRoll = 0;
 int motorAxisCommandPitch = 0;
 int motorAxisCommandYaw = 0;
 
-#if defined quadXConfig || defined quadPlusConfig || defined triConfig
-  int motorMinCommand[4];
-  int motorMaxCommand[4];
-  int motorConfiguratorCommand[4];
-#elif defined hexXConfig || defined hexPlusConfig
-  int motorMinCommand[6];
-  int motorMaxCommand[6];
-  int motorConfiguratorCommand[6];
+#if defined quadXConfig || defined quadPlusConfig || defined triConfig || defined quadY4Config
+  int motorMaxCommand[4] = {0,0,0,0};
+  int motorMinCommand[4] = {0,0,0,0};
+  int motorConfiguratorCommand[4] = {0,0,0,0};
+#elif defined hexXConfig || defined hexPlusConfig || defined hexY6Config
+  int motorMaxCommand[6] = {0,0,0,0,0,0};
+  int motorMinCommand[6] = {0,0,0,0,0,0};
+  int motorConfiguratorCommand[6] = {0,0,0,0,0,0};
+#elif defined (octoX8Congig) || defined (octoXCongig) || defined (octoPlusCongig) 
+  int motorMaxCommand[8] = {0,0,0,0,0,0,0,0};
+  int motorMinCommand[8] = {0,0,0,0,0,0,0,0};
+  int motorConfiguratorCommand[8] = {0,0,0,0,0,0,0,0};
 #endif
+
 
 
 void calculateFlightError();
@@ -362,23 +352,24 @@ void processHeading();
 void processAltitudeHold();
 void processCalibrateESC();
 void processFlightControl();
+void processAltitudeHold();
 //////////////////////////////////////////////////////
 
 //defined in SerialCom.pde
-void readSerialCommand(void);
-void sendSerialTelemetry(void);
+void readSerialCommand();
+void sendSerialTelemetry();
 void printInt(int data);
-float readFloatSerial(void);
+float readFloatSerial();
 void sendBinaryFloat(float);
 void sendBinaryuslong(unsigned long);
-void fastTelemetry(void);
-void comma(void);
+void fastTelemetry();
+void comma();
 //////////////////////////////////////////////////////
 
 #if defined(AeroQuadMega_CHR6DM) || defined(APM_OP_CHR6DM)
   float findMode(float *data, int arraySize); // defined in Sensors.pde
 #else
- int findMode(int *data, int arraySize); // defined in Sensors.pde
+  int findMode(int *data, int arraySize); // defined in Sensors.pde
 #endif
 
 // FUNCTION: return the number of bytes currently free in RAM      

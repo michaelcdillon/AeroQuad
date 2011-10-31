@@ -21,6 +21,22 @@
 #ifndef _AQ_PROCESS_FLIGHT_CONTROL_HEX_X_MODE_H_
 #define _AQ_PROCESS_FLIGHT_CONTROL_HEX_X_MODE_H_
 
+/*  
+            CW       CCW
+            
+           0....Front....0  
+           ......***......    
+     CCW   ......***......    CW
+           ......***......    
+           0....Back.....0  
+      
+           CW       CCW           
+*/     
+
+// @todo Kenny NOT FLIGHT TESTED
+
+
+
 #define FRONT_LEFT  MOTOR1
 #define REAR_RIGHT  MOTOR2
 #define FRONT_RIGHT MOTOR3
@@ -29,28 +45,28 @@
 #define LEFT        MOTOR6
 #define LASTMOTOR   MOTOR6+1
 
-
 void applyMotorCommand() {
-  motors->setMotorCommand(FRONT_LEFT,  throttle - motorAxisCommandPitch + motorAxisCommandRoll - motorAxisCommandYaw);
-  motors->setMotorCommand(REAR_RIGHT,  throttle + motorAxisCommandPitch - motorAxisCommandRoll + motorAxisCommandYaw);
-  motors->setMotorCommand(FRONT_RIGHT, throttle - motorAxisCommandPitch - motorAxisCommandRoll + motorAxisCommandYaw);
-  motors->setMotorCommand(REAR_LEFT,   throttle + motorAxisCommandPitch + motorAxisCommandRoll - motorAxisCommandYaw);
-  motors->setMotorCommand(RIGHT,       throttle                         - motorAxisCommandRoll - motorAxisCommandYaw);
-  motors->setMotorCommand(LEFT,        throttle                         + motorAxisCommandRoll + motorAxisCommandYaw);
+  const int throttleCorrection = abs(motorAxisCommandYaw*3/6);
+  motorCommand[FRONT_LEFT]  = (throttle - throttleCorrection) + motorAxisCommandRoll/2 - motorAxisCommandPitch/2 - (YAW_DIRECTION * motorAxisCommandYaw);
+  motorCommand[REAR_RIGHT]  = (throttle - throttleCorrection) - motorAxisCommandRoll/2 + motorAxisCommandPitch/2 + (YAW_DIRECTION * motorAxisCommandYaw);
+  motorCommand[FRONT_RIGHT] = (throttle - throttleCorrection) - motorAxisCommandRoll/2 - motorAxisCommandPitch/2 + (YAW_DIRECTION * motorAxisCommandYaw);
+  motorCommand[REAR_LEFT]   = (throttle - throttleCorrection) + motorAxisCommandRoll/2 + motorAxisCommandPitch/2 - (YAW_DIRECTION * motorAxisCommandYaw);
+  motorCommand[RIGHT]       = (throttle - throttleCorrection) - motorAxisCommandRoll                             - (YAW_DIRECTION * motorAxisCommandYaw);
+  motorCommand[LEFT]        = (throttle - throttleCorrection) + motorAxisCommandRoll                             + (YAW_DIRECTION * motorAxisCommandYaw);
 }
 
 void processMinMaxCommand() {
-  if ((motors->getMotorCommand(FRONT_LEFT) <= MINTHROTTLE) || (motors->getMotorCommand(REAR_LEFT) <= MINTHROTTLE) || (motors->getMotorCommand(RIGHT) <= MINTHROTTLE)) {
-    delta = receiver->getData(THROTTLE) - MINTHROTTLE;
-    motorMaxCommand[REAR_RIGHT] =  constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
-    motorMaxCommand[FRONT_RIGHT] = constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
-    motorMaxCommand[LEFT] =        constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
+  if ((motorCommand[FRONT_LEFT] <= MINTHROTTLE) || (motorCommand[REAR_LEFT] <= MINTHROTTLE) || (motorCommand[RIGHT] <= MINTHROTTLE)) {
+    delta = receiverCommand[THROTTLE] - MINTHROTTLE;
+    motorMaxCommand[REAR_RIGHT] =  constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
+    motorMaxCommand[FRONT_RIGHT] = constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
+    motorMaxCommand[LEFT] =        constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
   }
-  else if ((motors->getMotorCommand(FRONT_LEFT) >= MAXCOMMAND) || (motors->getMotorCommand(REAR_LEFT) >= MAXCOMMAND) || (motors->getMotorCommand(RIGHT) >= MAXCOMMAND)) {
-    delta = MAXCOMMAND - receiver->getData(THROTTLE);
-    motorMinCommand[REAR_RIGHT] =  constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
-    motorMinCommand[FRONT_RIGHT] = constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
-    motorMinCommand[LEFT] =        constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
+  else if ((motorCommand[FRONT_LEFT] >= MAXCOMMAND) || (motorCommand[REAR_LEFT] >= MAXCOMMAND) || (motorCommand[RIGHT] >= MAXCOMMAND)) {
+    delta = MAXCOMMAND - receiverCommand[THROTTLE];
+    motorMinCommand[REAR_RIGHT] =  constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
+    motorMinCommand[FRONT_RIGHT] = constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
+    motorMinCommand[LEFT] =        constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
   }     
   else {
     motorMaxCommand[REAR_RIGHT] =  MAXCOMMAND;
@@ -61,17 +77,17 @@ void processMinMaxCommand() {
     motorMinCommand[LEFT] =        MINTHROTTLE;
   }
 
-  if ((motors->getMotorCommand(REAR_RIGHT) <= MINTHROTTLE) || (motors->getMotorCommand(FRONT_RIGHT) <= MINTHROTTLE) || (motors->getMotorCommand(LEFT))){
-    delta = receiver->getData(THROTTLE) - MINTHROTTLE;
-    motorMaxCommand[FRONT_LEFT] = constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
-    motorMaxCommand[REAR_LEFT] =  constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
-    motorMaxCommand[RIGHT] =      constrain(receiver->getData(THROTTLE) + delta, MINTHROTTLE, MAXCHECK);
+  if ((motorCommand[REAR_RIGHT] <= MINTHROTTLE) || (motorCommand[FRONT_RIGHT] <= MINTHROTTLE) || (motorCommand[LEFT] <= MINTHROTTLE)){
+    delta = receiverCommand[THROTTLE] - MINTHROTTLE;
+    motorMaxCommand[FRONT_LEFT] = constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
+    motorMaxCommand[REAR_LEFT] =  constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
+    motorMaxCommand[RIGHT] =      constrain(receiverCommand[THROTTLE] + delta, MINTHROTTLE, MAXCHECK);
   }
-  else if ((motors->getMotorCommand(REAR_RIGHT) >= MAXCOMMAND) || (motors->getMotorCommand(FRONT_RIGHT) >= MAXCOMMAND) || (motors->getMotorCommand(LEFT))) {
-    delta = MAXCOMMAND - receiver->getData(THROTTLE);
-    motorMinCommand[FRONT_LEFT] = constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
-    motorMinCommand[REAR_LEFT] =  constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
-    motorMinCommand[RIGHT] =      constrain(receiver->getData(THROTTLE) - delta, MINTHROTTLE, MAXCOMMAND);
+  else if ((motorCommand[REAR_RIGHT] >= MAXCOMMAND) || (motorCommand[FRONT_RIGHT] >= MAXCOMMAND) || (motorCommand[LEFT]  >= MAXCOMMAND)) {
+    delta = MAXCOMMAND - receiverCommand[THROTTLE];
+    motorMinCommand[FRONT_LEFT] = constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
+    motorMinCommand[REAR_LEFT] =  constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
+    motorMinCommand[RIGHT] =      constrain(receiverCommand[THROTTLE] - delta, MINTHROTTLE, MAXCOMMAND);
   }     
   else {
     motorMaxCommand[FRONT_LEFT] = MAXCOMMAND;
@@ -85,7 +101,7 @@ void processMinMaxCommand() {
 
 void processHardManuevers() {
   if (flightMode == ACRO) {
-    if (receiver->getData(ROLL) < MINCHECK) {        // Maximum Left Roll Rate
+    if (receiverCommand[ROLL] < MINCHECK) {        // Maximum Left Roll Rate
       motorMinCommand[RIGHT] =       MAXCOMMAND;
       motorMinCommand[FRONT_RIGHT] = MAXCOMMAND;
       motorMinCommand[REAR_RIGHT] =  MAXCOMMAND;
@@ -93,7 +109,7 @@ void processHardManuevers() {
       motorMaxCommand[FRONT_LEFT] =  minAcro;
       motorMaxCommand[REAR_LEFT] =   minAcro;
     }
-    else if (receiver->getData(ROLL) > MAXCHECK) {   // Maximum Right Roll Rate
+    else if (receiverCommand[ROLL] > MAXCHECK) {   // Maximum Right Roll Rate
       motorMinCommand[LEFT] =        MAXCOMMAND;
       motorMinCommand[FRONT_LEFT] =  MAXCOMMAND;
       motorMinCommand[REAR_LEFT] =   MAXCOMMAND;
@@ -101,13 +117,13 @@ void processHardManuevers() {
       motorMaxCommand[FRONT_RIGHT] = minAcro;
       motorMaxCommand[REAR_RIGHT] =  minAcro;
     }
-    else if (receiver->getData(PITCH) < MINCHECK) {  // Maximum Nose Up Pitch Rate
+    else if (receiverCommand[PITCH] < MINCHECK) {  // Maximum Nose Up Pitch Rate
       motorMinCommand[FRONT_LEFT] =  MAXCOMMAND;
       motorMinCommand[FRONT_RIGHT] = MAXCOMMAND;
       motorMaxCommand[REAR_LEFT] =   minAcro;
       motorMaxCommand[REAR_RIGHT] =  minAcro;
     }
-    else if (receiver->getData(PITCH) > MAXCHECK) {  // Maximum Nose Down Pitch Rate
+    else if (receiverCommand[PITCH] > MAXCHECK) {  // Maximum Nose Down Pitch Rate
       motorMinCommand[REAR_LEFT] =   MAXCOMMAND;
       motorMinCommand[REAR_RIGHT] =  MAXCOMMAND;
       motorMaxCommand[FRONT_LEFT] =  minAcro;
@@ -115,5 +131,6 @@ void processHardManuevers() {
     }
   }
 }
+
 
 #endif  // #define _AQ_PROCESS_FLIGHT_CONTROL_HEX_X_MODE_H_

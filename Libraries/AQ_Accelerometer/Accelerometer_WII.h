@@ -24,46 +24,55 @@
 #include <Accelerometer.h>
 #include <Platform_Wii.h>
 
-class Accelerometer_WII : public Accelerometer {
-private:
-  Platform_Wii *platformWii;
-public:
-  Accelerometer_WII() {
-    accelScaleFactor = 0.09165093;  // Experimentally derived to produce meters/s^2 
-    smoothFactor = 1.0;
-  }
-
-  void setPlatformWii(Platform_Wii *platformWii) {
-    this->platformWii = platformWii;
-  }
-  
-  void measure(void) {
-    int accelADC[3];
-    accelADC[XAXIS] = platformWii->getAccelADC(XAXIS) - zero[XAXIS];
-    accelADC[YAXIS] = zero[YAXIS] - platformWii->getAccelADC(YAXIS);
-    accelADC[ZAXIS] = zero[ZAXIS] - platformWii->getAccelADC(ZAXIS);
-    for (byte axis = XAXIS; axis < LASTAXIS; axis++) {
-      meterPerSec[axis] = filterSmooth(accelADC[axis] * accelScaleFactor, meterPerSec[axis], smoothFactor);
-    }
-  }
-
-  void calibrate() {
-    int findZero[FINDZERO];
-
-    for(byte calAxis = XAXIS; calAxis < LASTAXIS; calAxis++) {
-      for (int i=0; i<FINDZERO; i++) {
-        platformWii->measure();
-        findZero[i] = platformWii->getAccelADC(calAxis);
-	    delay(5);
-      }
-      zero[calAxis] = findMedianInt(findZero, FINDZERO);
-    }
-    
-    // store accel value that represents 1g
-    oneG = -meterPerSec[ZAXIS];
-    // replace with estimated Z axis 0g value
-    zero[ZAXIS] = (zero[XAXIS] + zero[YAXIS]) / 2;
+void initializeAccel() {
+  accelScaleFactor = 0.09165093;  // Experimentally derived to produce meters/s^2 
 }
 
-};
+void measureAccel() {
+  meterPerSec[XAXIS] = (getWiiAccelADC(XAXIS) - accelZero[XAXIS]) * accelScaleFactor;
+  meterPerSec[YAXIS] = (accelZero[YAXIS] - getWiiAccelADC(YAXIS)) * accelScaleFactor;
+  meterPerSec[ZAXIS] = (accelZero[ZAXIS] - getWiiAccelADC(ZAXIS)) * accelScaleFactor;
+}
+
+void measureAccelSum() {
+/**
+  for (byte axis = XAXIS; axis < LASTAXIS; axis++) {
+	accelSample[axis] += getWiiAccelADC(axis);
+  }
+  accelSampleCount++;
+*/  
+}
+
+void evaluateMetersPerSec() {
+/**
+  for (byte axis = XAXIS; axis < LASTAXIS; axis++) {
+    if (axis == XAXIS)
+	  meterPerSec[axis] = accelSample[axis]/accelSampleCount - accelZero[axis];
+	else
+	  meterPerSec[axis] = accelZero[axis] - accelSample[axis]/accelSampleCount;
+	accelSample[axis] = 0.0;
+  }
+  accelSampleCount = 0;
+*/  
+}
+
+void calibrateAccel() {
+  int findZero[FINDZERO];
+
+  for(byte calAxis = XAXIS; calAxis < LASTAXIS; calAxis++) {
+    for (int i=0; i<FINDZERO; i++) {
+      readWiiSensors();
+      findZero[i] = getWiiAccelADC(calAxis);
+      delay(5);
+    }
+    accelZero[calAxis] = findMedianInt(findZero, FINDZERO);
+  }
+    
+  // store accel value that represents 1g
+  accelOneG = -meterPerSec[ZAXIS];
+  // replace with estimated Z axis 0g value
+  accelZero[ZAXIS] = (accelZero[XAXIS] + accelZero[YAXIS]) / 2;
+}
+
+
 #endif

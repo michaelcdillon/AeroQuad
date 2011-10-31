@@ -24,47 +24,21 @@
 #include <WProgram.h>
 #include <Axis.h>
 
-class Gyroscope {
-protected:
-  float scaleFactor;
-  float rate[3];
-  int zero[3];
-  float smoothFactor;
-  float gyroScaleFactor;
-  float heading;
-  unsigned long lastMesuredTime;
+float gyroRate[3] = {0.0,0.0,0.0};
+float gyroZero[3] = {0.0,0.0,0.0};
+float gyroSmoothFactor = 1.0;
+float gyroScaleFactor = 0.0;
+float gyroHeading = 0.0;
+unsigned long gyroLastMesuredTime = 0;
+
+void measureGyroSum();
+void evaluateGyroRate();
+float gyroSample[3] = {0.0,0.0,0.0};
+byte gyroSampleCount = 0;
+
   
-public:  
-  Gyroscope() {}
+void initializeGyro();
+void measureGyro();
+void calibrateGyro();
 
-  virtual void initialize() {}
-  virtual void measure() {}
-  virtual void calibrate() {}
-
-
-
-  void setZero(byte axis,float value) {
-    zero[axis] = value;
-  }
-
-  const float getZero(byte axis) {
-    return zero[axis];
-  }
-  
-  const float getSmoothFactor() {
-    return smoothFactor;
-  }
-
-  void setSmoothFactor(float value) {
-    smoothFactor = value;
-  }
-
-  const float getRadPerSec(byte axis) {
-    return rate[axis];
-  }
-
-  const float getHeading() {
-    return heading;
-  }
-};
 #endif
