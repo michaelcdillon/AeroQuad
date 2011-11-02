@@ -44,8 +44,8 @@
 #define ShowFlightTimer        //Displays how long the motors have been armed for since the Arduino was last reset
 #define ShowAttitudeIndicator
 #define ShowCallSign
-#define ShowRSSI
-//#define feet                   //Comment this line out for altitude measured in metres, uncomment it for feet
+//#define ShowRSSI
+#define feet                   //Comment this line out for altitude measured in metres, uncomment it for feet
 
 //Choose your (default in case autodetect enabled) video standard: default=NTSC
 //#define PAL
@@ -78,7 +78,7 @@
 #define CALLSIGN_ROW 2
 #define CALLSIGN_COL 23
 #ifdef ShowCallSign
-  const char *callsign = "AeroQD";
+  const char *callsign = "VTMike";
 #endif
 
 // RSSI monitor
